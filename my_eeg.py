@@ -53,7 +53,7 @@ def hsi_handler(address: str,*args):
         # print(hsi_string)  
 
 def gyro_handler(address: str,*args):
-    global mov_history
+    global mov_history,moved
     current=(args[0]+args[1]+args[2])
     if(int(current-mov_history)!=0):
         moved=True
@@ -81,7 +81,7 @@ def show_data():
 
         keys_list = list(dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)))
         tmp=str(keys_list[0])
-        if(moved and tmp.find("DELTA")==0):
+        if((moved and tmp.find("DELTA")==0)):
             print(keys_list[1])
         else:
             print(keys_list[0])
