@@ -4,10 +4,9 @@ from datetime import datetime
 from time import sleep
 from pythonosc import dispatcher
 from pythonosc import osc_server
-import statistics
-import math
-import os
 import operator
+import datetime
+import csv  
 
 #Network Variables
 ip = "0.0.0.0"
@@ -81,10 +80,19 @@ def show_data():
 
         keys_list = list(dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)))
         tmp=str(keys_list[0])
+        data="";
         if((moved and tmp.find("DELTA")==0)):
-            print(keys_list[1])
+            data=keys_list[1]
         else:
-            print(keys_list[0])
+            data=keys_list[0]
+
+        now = datetime.datetime.now()
+        print(str(now.hour)+":"+str(now.minute)+":"+str(now.second)+" = "+data)
+
+        fields=[str(now.hour)+":"+str(now.minute)+":"+str(now.second),data]
+        with open(r'EEG_LOG.csv', 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow(fields)
         moved=False
         
         # for item in dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)):
