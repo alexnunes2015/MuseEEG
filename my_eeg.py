@@ -4,6 +4,7 @@ from datetime import datetime
 from time import sleep
 from pythonosc import dispatcher
 from pythonosc import osc_server
+import threading
 import operator
 import datetime
 import csv  
@@ -28,8 +29,7 @@ delta=0
 mov_history=0
 moved=False
 
-t=0
-max_t=1500
+max_t=60
 
 
 def hsi_handler(address: str,*args):
@@ -60,43 +60,43 @@ def gyro_handler(address: str,*args):
 
 
 def show_data():
-    global gamma,beta,alpha,theta,delta,t,max_t,moved
-    t=t+1
+    global gamma,beta,alpha,theta,delta,t,max_t,moved,max_t
 
-    if(t>max_t):
-        t=0
-        thisdict = {
-            "GAMMA (CONCETRADO)": gamma,
-            "BETA (ACORDADO)":beta,
-            "ALPHA (MEDITAR)":alpha,
-            "THETA (SONHAR)":theta,
-            "DELTA (SONO PROFUNDO)":delta
-        }
-        gamma=0
-        beta=0
-        alpha=0
-        theta=0
-        delta=0
+    while True:
+        sleep(max_t)
+        if(gamma!=0 and beta!=0 and alpha!=0 and theta!=0 and delta!=0):
+            thisdict = {
+                "GAMMA (CONCETRADO)": gamma,
+                "BETA (ACORDADO)":beta,
+                "ALPHA (MEDITAR)":alpha,
+                "THETA (SONHAR)":theta,
+                "DELTA (SONO PROFUNDO)":delta
+            }
+            gamma=0
+            beta=0
+            alpha=0
+            theta=0
+            delta=0
 
-        keys_list = list(dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)))
-        tmp=str(keys_list[0])
-        data="";
-        if((moved and tmp.find("DELTA")==0)):
-            data=keys_list[1]
-        else:
-            data=keys_list[0]
+            keys_list = list(dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)))
+            tmp=str(keys_list[0])
+            data="";
+            if((moved and tmp.find("DELTA")==0)):
+                data=keys_list[1]
+            else:
+                data=keys_list[0]
 
-        now = datetime.datetime.now()
-        print(str(now.hour)+":"+str(now.minute)+":"+str(now.second)+" = "+data)
+            now = datetime.datetime.now()
+            print(str(now.hour)+":"+str(now.minute)+":"+str(now.second)+" = "+data)
 
-        fields=[str(now.hour)+":"+str(now.minute)+":"+str(now.second),data]
-        with open(r'EEG_LOG.csv', 'a') as f:
-            writer = csv.writer(f)
-            writer.writerow(fields)
-        moved=False
-        
-        # for item in dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)):
-        #     print("Key : {} , Value : {}".format(item,dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True))[item]))
+            fields=[str(now.hour)+":"+str(now.minute)+":"+str(now.second),data]
+            with open(r'EEG_LOG.csv', 'a') as f:
+                writer = csv.writer(f)
+                writer.writerow(fields)
+            moved=False
+            
+            # for item in dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)):
+            #     print("Key : {} , Value : {}".format(item,dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True))[item]))
 
 def abs_handler(address: str,*args):
     global hsi, abs_waves, rel_waves,hsi_ok
@@ -122,8 +122,6 @@ def abs_handler(address: str,*args):
         theta+=abs_waves[wave]
     if(address.find("delta")!=-1):
         delta+=abs_waves[wave]
-    show_data()
-
 
 
     
@@ -138,7 +136,9 @@ if __name__ == "__main__":
     dispatcher.map("/muse/gyro", gyro_handler)
 
     dispatcher.map("/muse/elements/horseshoe", hsi_handler)
-
+    x = threading.Thread(target=show_data)
+    x.daemon = True
+    x.start()
     server = osc_server.ThreadingOSCUDPServer((ip, port), dispatcher)
     print("Listening on UDP port "+str(port))
     server.serve_forever()
