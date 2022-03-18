@@ -1,6 +1,7 @@
 from ast import arg
 from audioop import add
 from datetime import datetime
+from lib2to3.pgen2.token import EQUAL
 from time import sleep
 from pythonosc import dispatcher
 from pythonosc import osc_server
@@ -25,6 +26,10 @@ beta=0
 alpha=0
 theta=0
 delta=0
+passCounter=0
+
+timesDeepSleep=0
+alreadyDeepSleepd=False
 
 mov_history=0
 moved=False
@@ -60,43 +65,68 @@ def gyro_handler(address: str,*args):
 
 
 def show_data():
-    global gamma,beta,alpha,theta,delta,t,max_t,moved
+    global gamma,beta,alpha,theta,delta,t,max_t,moved,passCounter,alreadyDeepSleepd
 
     while True:
         sleep(max_t)
         if(gamma!=0 and beta!=0 and alpha!=0 and theta!=0 and delta!=0):
             thisdict = {
-                "GAMMA (CONCETRADO)": gamma,
-                "BETA (ACORDADO)":beta,
-                "ALPHA (MEDITAR)":alpha,
-                "THETA (SONHAR)":theta,
-                "DELTA (SONO PROFUNDO)":delta
+                "GAMMA": gamma/passCounter,
+                "BETA":beta/passCounter,
+                "ALPHA":alpha/passCounter,
+                "THETA":theta/passCounter,
+                "DELTA":delta/passCounter
             }
-            gamma=0
-            beta=0
-            alpha=0
-            theta=0
-            delta=0
 
             keys_list = list(dict( sorted(thisdict.items(), key=operator.itemgetter(1),reverse=True)))
-            tmp=str(keys_list[0])
+            wave=str(keys_list[0])
             data="";
-            if((moved and tmp.find("DELTA")==0)):
-                data=keys_list[1]
-            else:
-                data=keys_list[0]
+
+            if wave == "DELTA":  # se esta em DELTA
+                if not moved:    # se não houve movimentos fisicos, então realmente esta em sono profundo
+                    if not alreadyDeepSleepd: # se ja nao esteve em sono profundo antes (para facilitar a detectção do sono REM)
+                        if timesDeepSleep<5:  # se ainda nao teve 5 minutos seguidos de sono profundo
+                            timesDeepSleep=timesDeepSleep+1 # adiciona +1 minuto para no contador para certificar sono profundo
+                            data="Provavelmente em sono profundo"
+                        else:                 # caso ja tenha passado de 5 minitos de sono profundo)
+                            data="Em sono profundo"
+                            alreadyDeepSleepd=True # guarda o valor de realmente ja ter passado mais de 5 minutos de sono profundo  
+                    else: # ja esteve em sono profundo antes
+                        if timesDeepSleep<5:  # se ainda nao teve 5 minutos seguidos de sono profundo
+                            timesDeepSleep=timesDeepSleep+1 # adiciona +1 minuto para no contador para certificar sono profundo
+                            data="Provavelmente em sono profundo"
+                        else:                 # caso ja tenha passado de 5 minitos de sono profundo)
+                            data="Em sono profundo"
+                            alreadyDeepSleepd=True # guarda o valor de realmente ja ter passado mais de 5 minutos de sono profundo  
+                else:  
+                    data="Acordado" # esta em delta porem houve movimentos entao é um falso sono profundo
+                    if not alreadyDeepSleepd: # se ja nao esteve em sono profundo antes (para facilitar a detectção do sono REM)
+                        timesDeepSleep=0 # reinicializa o contador de minutos seguidos de sono profundo   
+                    
+            else: # se tem actividade cerebral e NAO esta em sono profundo
+                timesDeepSleep=0 # reinicializa o contador de minutos seguidos de sono profundo   
+                if alreadyDeepSleepd: # Ja esteve em sono profundo antes
+                    data="Provavelmente a sonhar"
+                else:
+                    data="Acordado"
 
             now = datetime.datetime.now()
             print(str(now.hour)+":"+str(now.minute)+":"+str(now.second)+" = "+data)
 
             fields=[str(now.hour)+":"+str(now.minute)+":"+str(now.second),data]
-            with open(r'EEG_LOG.csv', 'a') as f:
+            with open(r'EEG_SLEEP_LOG.csv', 'a') as f:
                 writer = csv.writer(f)
                 writer.writerow(fields)
             moved=False
+            gamma=0
+            beta=0
+            alpha=0
+            theta=0
+            delta=0
+            passCounter=0
 
 def abs_handler(address: str,*args):
-    global hsi, abs_waves, rel_waves,hsi_ok
+    global hsi, abs_waves, rel_waves,hsi_ok,passCounter
     global gamma,beta,alpha,theta,delta
     wave = args[0][0]
     
@@ -108,6 +138,7 @@ def abs_handler(address: str,*args):
             sumVals+=args[i+1]
     if(countVals>0):
         abs_waves[wave] = sumVals/countVals
+        passCounter=passCounter+1
 
     if(address.find("gamma")!=-1):
         gamma+=abs_waves[wave]
